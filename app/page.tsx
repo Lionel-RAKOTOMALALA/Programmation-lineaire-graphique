@@ -50,7 +50,7 @@ export default function Home() {
                     <LineChartIcon className="h-4 w-4 mr-2" /> Visualisation Graphique
                   </TabsTrigger>
                   <TabsTrigger value="table" className="flex items-center">
-                    <TableIcon className="h-4 w-4 mr-2" /> Méthode du Simplexe
+                    <TableIcon className="h-4 w-4 mr-2" /> Méthode de Simplexe
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="visualization" className="mt-4">
