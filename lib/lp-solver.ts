@@ -2,7 +2,7 @@ export type LPProblem = {
   problemType: 'max' | 'min'
   objectiveFunction: number[]
   constraintCoefficients: number[][]
-  constraintSigns: string[]
+  constraintSigns: ("<=" | "=" | ">=")[]
   constraintValues: number[]
 }
 

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false })
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false }) as any
 
 type LPVisualizationProps = {
   constraints: {
@@ -127,7 +127,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
           size: 10,
           color: 'rgb(255, 0, 0)'
         }
-      }
+      } as any
     }
     
     const objFuncSlope = -objectiveFunction[0] / objectiveFunction[1]

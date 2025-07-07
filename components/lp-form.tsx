@@ -86,7 +86,8 @@ export function LPForm({ onSolve }: LPFormProps) {
       const newConstraintValues = [...form.getValues().constraintValues, 0]
       
       form.setValue('constraintCoefficients', newConstraintCoefficients)
-      form.setValue('constraintSigns', newConstraintSigns)
+      const allowedSigns = ["<=", "=", ">="];
+      form.setValue('constraintSigns', newConstraintSigns.filter(sign => allowedSigns.includes(sign)) as ("<=" | "=" | ">=")[])
       form.setValue('constraintValues', newConstraintValues)
       setNumConstraints(numConstraints + 1)
     }
@@ -257,8 +258,10 @@ export function LPForm({ onSolve }: LPFormProps) {
                     {...form.register(`constraintSigns.${constraintIndex}`, {
                       onChange: (e) => {
                         const current = [...form.getValues().constraintSigns]
-                        current[constraintIndex] = e.target.value as any
-                        form.setValue('constraintSigns', current)
+                        const allowedSigns = ["<=", "=", ">="];
+                        const newConstraintSigns = [...current]
+                        newConstraintSigns[constraintIndex] = e.target.value as any
+                        form.setValue('constraintSigns', newConstraintSigns.filter(sign => allowedSigns.includes(sign)) as ("<=" | "=" | ">=")[])
                       }
                     })}
                   >
