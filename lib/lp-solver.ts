@@ -4,6 +4,8 @@ export type LPProblem = {
   constraintCoefficients: number[][]
   constraintSigns: ("<=" | "=" | ">=")[]
   constraintValues: number[]
+  objectiveOperator?: string // + ou -
+  constraintOperators?: string[] // tableau de + ou -
 }
 
 export type LPSolution = {
@@ -156,10 +158,114 @@ function simplexMethod(
   };
 }
 
+function isFeasible(point: number[], constraintCoefficients: number[][], constraintSigns: ("<=" | "=" | ">=")[], constraintValues: number[]): boolean {
+  for (let i = 0; i < constraintCoefficients.length; i++) {
+    const lhs = constraintCoefficients[i][0] * point[0] + constraintCoefficients[i][1] * point[1];
+    if (constraintSigns[i] === '<=' && lhs > constraintValues[i] + 1e-8) return false;
+    if (constraintSigns[i] === '>=' && lhs < constraintValues[i] - 1e-8) return false;
+    if (constraintSigns[i] === '=' && Math.abs(lhs - constraintValues[i]) > 1e-8) return false;
+  }
+  // x1 >= 0, x2 >= 0
+  if (point[0] < -1e-8 || point[1] < -1e-8) return false;
+  return true;
+}
+
+function intersection2D(a1: number[], b1: number, a2: number[], b2: number): number[] | null {
+  // a1[0] * x + a1[1] * y = b1
+  // a2[0] * x + a2[1] * y = b2
+  const det = a1[0] * a2[1] - a2[0] * a1[1];
+  if (Math.abs(det) < 1e-8) return null; // Parallel
+  const x = (b1 * a2[1] - b2 * a1[1]) / det;
+  const y = (a1[0] * b2 - a2[0] * b1) / det;
+  return [x, y];
+}
+
+function graphicalMethod(
+  objectiveFunction: number[],
+  constraintCoefficients: number[][],
+  constraintSigns: ("<=" | "=" | ">=")[],
+  constraintValues: number[],
+  isMaximization: boolean
+): LPSolution {
+  // Générer tous les points d'intersection
+  const points: number[][] = [];
+  const n = constraintCoefficients.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const pt = intersection2D(constraintCoefficients[i], constraintValues[i], constraintCoefficients[j], constraintValues[j]);
+      if (pt) points.push(pt);
+    }
+  }
+  // Intersections avec x1=0 et x2=0
+  for (let i = 0; i < n; i++) {
+    // x1 = 0
+    if (Math.abs(constraintCoefficients[i][0]) > 1e-8) {
+      const x2 = (constraintValues[i] - 0) / constraintCoefficients[i][1];
+      if (!isNaN(x2)) points.push([0, x2]);
+    }
+    // x2 = 0
+    if (Math.abs(constraintCoefficients[i][1]) > 1e-8) {
+      const x1 = (constraintValues[i] - 0) / constraintCoefficients[i][0];
+      if (!isNaN(x1)) points.push([x1, 0]);
+    }
+  }
+  // x1=0, x2=0
+  points.push([0,0]);
+
+  // Filtrer les points réalisables
+  const feasible: number[][] = points.filter(pt => isFeasible(pt, constraintCoefficients, constraintSigns, constraintValues));
+  if (feasible.length === 0) {
+    return {
+      isValid: false,
+      coordinates: [],
+      value: 0,
+      tableData: { headers: [], rows: [] }
+    };
+  }
+  // Calculer la valeur de la fonction objectif pour chaque point réalisable
+  const values = feasible.map(pt => objectiveFunction[0]*pt[0] + objectiveFunction[1]*pt[1]);
+  let idx = 0;
+  if (isMaximization) {
+    let max = values[0];
+    for (let i = 1; i < values.length; i++) if (values[i] > max) { max = values[i]; idx = i; }
+  } else {
+    let min = values[0];
+    for (let i = 1; i < values.length; i++) if (values[i] < min) { min = values[i]; idx = i; }
+  }
+  return {
+    isValid: true,
+    coordinates: feasible[idx],
+    value: values[idx],
+    tableData: { headers: ["x1", "x2", "Z"], rows: feasible.map((pt, i) => [pt[0].toFixed(4), pt[1].toFixed(4), values[i].toFixed(4)]) }
+  };
+}
+
 export const solveLPProblem = (problem: LPProblem): LPSolution => {
   try {
-    const { objectiveFunction, constraintCoefficients, constraintValues, problemType } = problem;
-    
+    let { objectiveFunction, constraintCoefficients, constraintValues, constraintSigns, problemType, objectiveOperator, constraintOperators } = problem;
+
+    // Prise en compte du signe de la fonction objectif
+    if (objectiveOperator === '-') {
+      objectiveFunction = objectiveFunction.map((c, i) => i === 0 ? c : -Math.abs(c));
+    }
+    // Par défaut ou +, on garde les coefficients tels quels
+
+    // Prise en compte des signes dans les contraintes
+    if (constraintOperators && constraintOperators.length === constraintCoefficients.length) {
+      constraintCoefficients = constraintCoefficients.map((row, i) =>
+        constraintOperators[i] === '-' ? row.map((c, j) => j === 0 ? c : -Math.abs(c)) : row
+      );
+    }
+
+    if (objectiveFunction.length === 2) {
+      return graphicalMethod(
+        objectiveFunction,
+        constraintCoefficients,
+        constraintSigns,
+        constraintValues,
+        problemType === 'max'
+      );
+    }
     return simplexMethod(
       objectiveFunction,
       constraintCoefficients,

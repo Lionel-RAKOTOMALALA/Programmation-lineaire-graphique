@@ -35,6 +35,12 @@ type LPFormProps = {
 export function LPForm({ onSolve }: LPFormProps) {
   const [numVariables, setNumVariables] = useState(2)
   const [numConstraints, setNumConstraints] = useState(2)
+  const [operator, setOperator] = useState<string>("+");
+  const [constraintOperators, setConstraintOperators] = useState<string[]>(Array(numConstraints).fill("+"));
+
+  // Ajout des états pour les signes de chaque coefficient
+  const [objectiveSigns, setObjectiveSigns] = useState<string[]>(Array(numVariables).fill('+'));
+  const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(numConstraints).fill(null).map(() => Array(numVariables).fill('+')));
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -57,6 +63,8 @@ export function LPForm({ onSolve }: LPFormProps) {
       
       form.setValue('objectiveFunction', newObjectiveFunction)
       form.setValue('constraintCoefficients', newConstraintCoefficients)
+      setObjectiveSigns([...objectiveSigns, '+']);
+      setConstraintSigns(constraintSigns.map(row => [...row, '+']));
       setNumVariables(numVariables + 1)
     }
   }
@@ -74,6 +82,8 @@ export function LPForm({ onSolve }: LPFormProps) {
       
       form.setValue('objectiveFunction', newObjectiveFunction)
       form.setValue('constraintCoefficients', newConstraintCoefficients)
+      setObjectiveSigns(objectiveSigns.slice(0, -1));
+      setConstraintSigns(constraintSigns.map(row => row.slice(0, -1)));
       setNumVariables(numVariables - 1)
     }
   }
@@ -89,6 +99,8 @@ export function LPForm({ onSolve }: LPFormProps) {
       const allowedSigns = ["<=", "=", ">="];
       form.setValue('constraintSigns', newConstraintSigns.filter(sign => allowedSigns.includes(sign)) as ("<=" | "=" | ">=")[])
       form.setValue('constraintValues', newConstraintValues)
+      setConstraintOperators([...constraintOperators, "+"]);
+      setConstraintSigns([...constraintSigns, Array(numVariables).fill('+')]);
       setNumConstraints(numConstraints + 1)
     }
   }
@@ -107,12 +119,23 @@ export function LPForm({ onSolve }: LPFormProps) {
       form.setValue('constraintCoefficients', newConstraintCoefficients)
       form.setValue('constraintSigns', newConstraintSigns)
       form.setValue('constraintValues', newConstraintValues)
+      setConstraintOperators(constraintOperators.slice(0, -1));
+      setConstraintSigns(constraintSigns.slice(0, -1));
       setNumConstraints(numConstraints - 1)
     }
   }
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    onSolve(data)
+    // Appliquer les signes aux coefficients
+    const realObjective = data.objectiveFunction.map((val, i) => objectiveSigns[i] === '-' ? -Math.abs(val) : Math.abs(val));
+    const realConstraints = data.constraintCoefficients.map((row, i) =>
+      row.map((val, j) => constraintSigns[i][j] === '-' ? -Math.abs(val) : Math.abs(val))
+    );
+    onSolve({
+      ...data,
+      objectiveFunction: realObjective,
+      constraintCoefficients: realConstraints
+    });
   }
 
   return (
@@ -180,6 +203,18 @@ export function LPForm({ onSolve }: LPFormProps) {
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: numVariables }).map((_, index) => (
                   <div key={`obj-${index}`} className="flex items-center">
+                    <select
+                      value={objectiveSigns[index]}
+                      onChange={e => {
+                        const newSigns = [...objectiveSigns];
+                        newSigns[index] = e.target.value;
+                        setObjectiveSigns(newSigns);
+                      }}
+                      className="border rounded px-1 py-0.5 mr-1"
+                    >
+                      <option value="+">+</option>
+                      <option value="-">-</option>
+                    </select>
                     <Input
                       className="w-16 text-center"
                       type="number"
@@ -235,6 +270,18 @@ export function LPForm({ onSolve }: LPFormProps) {
                 <div key={`constraint-${constraintIndex}`} className="flex items-center flex-wrap gap-2">
                   {Array.from({ length: numVariables }).map((_, varIndex) => (
                     <div key={`constraint-${constraintIndex}-var-${varIndex}`} className="flex items-center">
+                      <select
+                        value={constraintSigns[constraintIndex][varIndex]}
+                        onChange={e => {
+                          const newSigns = constraintSigns.map(row => [...row]);
+                          newSigns[constraintIndex][varIndex] = e.target.value;
+                          setConstraintSigns(newSigns);
+                        }}
+                        className="border rounded px-1 py-0.5 mr-1"
+                      >
+                        <option value="+">+</option>
+                        <option value="-">-</option>
+                      </select>
                       <Input
                         className="w-16 text-center"
                         type="number"
