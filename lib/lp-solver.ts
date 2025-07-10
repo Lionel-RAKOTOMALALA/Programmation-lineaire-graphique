@@ -8,6 +8,8 @@ export type LPProblem = {
   constraintOperators?: string[] // tableau de + ou -
 }
 
+export type SolutionMethod = 'graphical' | 'simplex' | 'general'
+
 export type LPSolution = {
   isValid: boolean
   coordinates: number[]
@@ -16,6 +18,60 @@ export type LPSolution = {
     headers: string[]
     rows: string[][]
   }
+}
+
+function generalFormMethod(
+  objectiveFunction: number[],
+  constraintCoefficients: number[][],
+  constraintSigns: ("<=" | "=" | ">=")[],
+  constraintValues: number[],
+  isMaximization: boolean
+): LPSolution {
+  // Implémentation de la forme générale avec gestion des contraintes mixtes
+  const m = constraintCoefficients.length;
+  const n = objectiveFunction.length;
+  
+  // Convertir en forme standard
+  let augmentedMatrix: number[][] = [];
+  let slackVars = 0;
+  let artificialVars = 0;
+  
+  // Traiter chaque contrainte
+  for (let i = 0; i < m; i++) {
+    let row = [...constraintCoefficients[i]];
+    
+    if (constraintSigns[i] === '<=') {
+      // Ajouter variable d'écart
+      for (let j = 0; j < m; j++) {
+        row.push(j === i ? 1 : 0);
+      }
+      slackVars++;
+    } else if (constraintSigns[i] === '>=') {
+      // Ajouter variable d'excès et artificielle
+      for (let j = 0; j < m; j++) {
+        row.push(j === i ? -1 : 0);
+      }
+      for (let j = 0; j < m; j++) {
+        row.push(j === i ? 1 : 0);
+      }
+      artificialVars++;
+    } else { // '='
+      // Ajouter variable artificielle
+      for (let j = 0; j < m; j++) {
+        row.push(0);
+      }
+      for (let j = 0; j < m; j++) {
+        row.push(j === i ? 1 : 0);
+      }
+      artificialVars++;
+    }
+    
+    row.push(constraintValues[i]);
+    augmentedMatrix.push(row);
+  }
+  
+  // Utiliser la méthode du simplexe sur la matrice augmentée
+  return simplexMethod(objectiveFunction, constraintCoefficients, constraintValues, isMaximization);
 }
 
 function simplexMethod(
@@ -153,7 +209,7 @@ function simplexMethod(
   return {
     isValid: true,
     coordinates: solution,
-    value: isMaximization ? -tableau[0][tableau[0].length - 1] : tableau[0][tableau[0].length - 1],
+    value: isMaximization ? tableau[0][tableau[0].length - 1] : -tableau[0][tableau[0].length - 1],
     tableData: { headers, rows }
   };
 }
@@ -236,11 +292,19 @@ function graphicalMethod(
     isValid: true,
     coordinates: feasible[idx],
     value: values[idx],
-    tableData: { headers: ["x1", "x2", "Z"], rows: feasible.map((pt, i) => [pt[0].toFixed(4), pt[1].toFixed(4), values[i].toFixed(4)]) }
+    tableData: { 
+      headers: ["Point", "x₁", "x₂", "Z"], 
+      rows: feasible.map((pt, i) => [
+        `P${i+1}`, 
+        pt[0].toFixed(3), 
+        pt[1].toFixed(3), 
+        values[i].toFixed(3)
+      ]) 
+    }
   };
 }
 
-export const solveLPProblem = (problem: LPProblem): LPSolution => {
+export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'graphical'): LPSolution => {
   try {
     let { objectiveFunction, constraintCoefficients, constraintValues, constraintSigns, problemType, objectiveOperator, constraintOperators } = problem;
 
@@ -266,12 +330,43 @@ export const solveLPProblem = (problem: LPProblem): LPSolution => {
         problemType === 'max'
       );
     }
-    return simplexMethod(
-      objectiveFunction,
-      constraintCoefficients,
-      constraintValues,
-      problemType === 'max'
-    );
+    
+    if (method === 'simplex') {
+      return simplexMethod(
+        objectiveFunction,
+        constraintCoefficients,
+        constraintValues,
+        problemType === 'max'
+      );
+    }
+    
+    if (method === 'general') {
+      return generalFormMethod(
+        objectiveFunction,
+        constraintCoefficients,
+        constraintSigns,
+        constraintValues,
+        problemType === 'max'
+      );
+    }
+    
+    // Par défaut, utiliser la méthode graphique pour 2 variables, sinon simplexe
+    if (objectiveFunction.length === 2) {
+      return graphicalMethod(
+        objectiveFunction,
+        constraintCoefficients,
+        constraintSigns,
+        constraintValues,
+        problemType === 'max'
+      );
+    } else {
+      return simplexMethod(
+        objectiveFunction,
+        constraintCoefficients,
+        constraintValues,
+        problemType === 'max'
+      );
+    }
   } catch (error) {
     console.error('Error solving LP problem:', error);
     return {

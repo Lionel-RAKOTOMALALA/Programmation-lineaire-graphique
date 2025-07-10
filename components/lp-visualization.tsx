@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import type { SolutionMethod } from '@/app/page'
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false }) as any
 
@@ -20,9 +21,10 @@ type LPVisualizationProps = {
     coordinates: number[]
     value: number
   }
+  method: SolutionMethod
 }
 
-export function LPVisualization({ constraints, objectiveFunction, problemType, solution }: LPVisualizationProps) {
+export function LPVisualization({ constraints, objectiveFunction, problemType, solution, method }: LPVisualizationProps) {
   const [plotData, setPlotData] = useState<any[]>([])
   const [plotLayout, setPlotLayout] = useState<any>({})
 
@@ -184,13 +186,21 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
   }, [constraints, objectiveFunction, problemType, solution])
 
   return (
-    <Card className="p-6 shadow-md">
-      <h2 className="text-2xl font-bold mb-4">Solution Graphique</h2>
+    <Card className="modern-card p-6">
+      <div className="flex items-center space-x-3 mb-4">
+        <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-cyan-300 rounded-full"></div>
+        <h2 className="text-2xl font-bold gradient-text">
+          Visualisation - {method === 'graphical' ? 'Méthode Graphique' : 
+                          method === 'simplex' ? 'Simplexe' : 'Forme Générale'}
+        </h2>
+      </div>
       <Separator className="my-4" />
       
       {objectiveFunction && objectiveFunction.length > 2 ? (
-        <div className="p-4 bg-yellow-50 text-yellow-700 rounded-md">
-          La visualisation graphique n'est disponible que pour les problèmes à 2 variables.
+        <div className="p-4 glass-effect rounded-xl border border-yellow-500/20">
+          <p className="text-yellow-300">
+            ⚠️ La visualisation graphique n'est disponible que pour les problèmes à 2 variables.
+          </p>
         </div>
       ) : (
         <div className="w-full h-[500px]">
@@ -200,28 +210,32 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
               layout={plotLayout}
               style={{ width: '100%', height: '100%' }}
               useResizeHandler={true}
-              config={{ responsive: true }}
+              config={{ responsive: true, displayModeBar: false }}
             />
           )}
         </div>
       )}
       
       {solution.isValid && (
-        <div className="mt-6 p-4 bg-green-50 text-green-700 rounded-md">
-          <h3 className="text-lg font-semibold mb-2">Résumé de la Solution</h3>
-          <p>
-            <strong>Valeur Optimale :</strong> Z = {solution.value.toFixed(2)}
-          </p>
-          <p>
-            <strong>Point Optimal :</strong> (
+        <div className="mt-6 p-4 glass-effect rounded-xl border border-green-500/20">
+          <h3 className="text-lg font-semibold mb-3 text-green-400">📊 Résumé de la Solution</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-blue-200/70 mb-1">Valeur Optimale :</p>
+              <p className="text-xl font-bold text-green-400">Z = {solution.value.toFixed(3)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-blue-200/70 mb-1">Point Optimal :</p>
+              <p className="text-lg font-mono text-white">(
             {solution.coordinates.map((coord, i) => (
               <span key={i}>
                 x<sub>{i+1}</sub> = {coord.toFixed(2)}
                 {i < solution.coordinates.length - 1 ? ', ' : ''}
               </span>
             ))}
-            )
-          </p>
+              )</p>
+            </div>
+          </div>
         </div>
       )}
     </Card>

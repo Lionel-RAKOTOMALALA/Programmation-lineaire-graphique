@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { PlusCircle, MinusCircle, ChevronRightCircle } from 'lucide-react'
+import type { SolutionMethod } from '@/app/page'
 import {
   Form,
   FormControl,
@@ -30,9 +31,10 @@ const formSchema = z.object({
 
 type LPFormProps = {
   onSolve: (data: z.infer<typeof formSchema>) => void
+  selectedMethod: SolutionMethod
 }
 
-export function LPForm({ onSolve }: LPFormProps) {
+export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
   const [numVariables, setNumVariables] = useState(2)
   const [numConstraints, setNumConstraints] = useState(2)
   const [operator, setOperator] = useState<string>("+");
@@ -139,46 +141,56 @@ export function LPForm({ onSolve }: LPFormProps) {
   }
 
   return (
-    <div className="p-6 bg-card rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4">Problème de Programmation Linéaire</h2>
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-bold gradient-text">Configuration du Problème</h2>
+        <p className="text-blue-200/70">
+          {selectedMethod === 'graphical' && 'Méthode graphique - Limité à 2 variables'}
+          {selectedMethod === 'simplex' && 'Algorithme du simplexe - Tableau détaillé'}
+          {selectedMethod === 'general' && 'Forme générale - Approche matricielle'}
+        </p>
+      </div>
+      
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
             control={form.control}
             name="problemType"
             render={({ field }) => (
-              <FormItem className="space-y-1">
-                <FormLabel>Type de Problème</FormLabel>
+              <FormItem className="space-y-3">
+                <FormLabel className="text-lg font-semibold text-blue-300">Type de Problème</FormLabel>
                 <RadioGroup
                   onValueChange={field.onChange}
                   defaultValue={field.value}
-                  className="flex space-x-4"
+                  className="flex space-x-6"
                 >
-                  <FormItem className="flex items-center space-x-1 space-y-0">
+                  <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
-                      <RadioGroupItem value="max" />
+                      <RadioGroupItem value="max" className="border-blue-400 text-blue-400" />
                     </FormControl>
-                    <FormLabel className="font-normal">Maximiser</FormLabel>
+                    <FormLabel className="font-medium text-white cursor-pointer">Maximiser</FormLabel>
                   </FormItem>
-                  <FormItem className="flex items-center space-x-1 space-y-0">
+                  <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
-                      <RadioGroupItem value="min" />
+                      <RadioGroupItem value="min" className="border-blue-400 text-blue-400" />
                     </FormControl>
-                    <FormLabel className="font-normal">Minimiser</FormLabel>
+                    <FormLabel className="font-medium text-white cursor-pointer">Minimiser</FormLabel>
                   </FormItem>
                 </RadioGroup>
               </FormItem>
             )}
           />
 
-          <div className="space-y-4">
+          <div className="space-y-4 glass-effect rounded-xl p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Fonction Objectif</h3>
-              <div className="flex space-x-2">
+              <h3 className="text-lg font-semibold text-blue-300">Fonction Objectif</h3>
+              {selectedMethod !== 'graphical' && (
+                <div className="flex space-x-2">
                 <Button 
                   type="button" 
                   size="sm" 
-                  variant="outline" 
+                  variant="outline"
+                  className="border-blue-500/50 text-blue-300 hover:bg-blue-500/20"
                   onClick={removeVariable}
                   disabled={numVariables <= 2}
                 >
@@ -188,7 +200,8 @@ export function LPForm({ onSolve }: LPFormProps) {
                 <Button 
                   type="button" 
                   size="sm" 
-                  variant="outline" 
+                  variant="outline"
+                  className="border-blue-500/50 text-blue-300 hover:bg-blue-500/20"
                   onClick={addVariable}
                   disabled={numVariables >= 5}
                 >
@@ -196,10 +209,11 @@ export function LPForm({ onSolve }: LPFormProps) {
                   Variable
                 </Button>
               </div>
+              )}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">Z = </span>
+            <div className="flex items-center space-x-3">
+              <span className="text-lg font-semibold text-blue-300">Z = </span>
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: numVariables }).map((_, index) => (
                   <div key={`obj-${index}`} className="flex items-center">
@@ -210,13 +224,13 @@ export function LPForm({ onSolve }: LPFormProps) {
                         newSigns[index] = e.target.value;
                         setObjectiveSigns(newSigns);
                       }}
-                      className="border rounded px-1 py-0.5 mr-1"
+                      className="border border-blue-500/50 bg-blue-900/50 text-white rounded px-2 py-1 mr-2"
                     >
                       <option value="+">+</option>
                       <option value="-">-</option>
                     </select>
                     <Input
-                      className="w-16 text-center"
+                      className="w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
                       type="number"
                       {...form.register(`objectiveFunction.${index}`, { 
                         valueAsNumber: true,
@@ -228,8 +242,8 @@ export function LPForm({ onSolve }: LPFormProps) {
                         }
                       })}
                     />
-                    <span className="ml-1 mr-2">x<sub>{index + 1}</sub></span>
-                    {index < numVariables - 1 && <span>+</span>}
+                    <span className="ml-1 mr-2 text-blue-300">x<sub>{index + 1}</sub></span>
+                    {index < numVariables - 1 && <span className="text-blue-400">+</span>}
                   </div>
                 ))}
               </div>
@@ -238,14 +252,15 @@ export function LPForm({ onSolve }: LPFormProps) {
 
           <Separator />
 
-          <div className="space-y-4">
+          <div className="space-y-4 glass-effect rounded-xl p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Contraintes</h3>
+              <h3 className="text-lg font-semibold text-blue-300">Contraintes</h3>
               <div className="flex space-x-2">
                 <Button 
                   type="button" 
                   size="sm" 
-                  variant="outline" 
+                  variant="outline"
+                  className="border-blue-500/50 text-blue-300 hover:bg-blue-500/20"
                   onClick={removeConstraint}
                   disabled={numConstraints <= 2}
                 >
@@ -255,7 +270,8 @@ export function LPForm({ onSolve }: LPFormProps) {
                 <Button 
                   type="button" 
                   size="sm" 
-                  variant="outline" 
+                  variant="outline"
+                  className="border-blue-500/50 text-blue-300 hover:bg-blue-500/20"
                   onClick={addConstraint}
                   disabled={numConstraints >= 5}
                 >
@@ -277,13 +293,13 @@ export function LPForm({ onSolve }: LPFormProps) {
                           newSigns[constraintIndex][varIndex] = e.target.value;
                           setConstraintSigns(newSigns);
                         }}
-                        className="border rounded px-1 py-0.5 mr-1"
+                        className="border border-blue-500/50 bg-blue-900/50 text-white rounded px-2 py-1 mr-2"
                       >
                         <option value="+">+</option>
                         <option value="-">-</option>
                       </select>
                       <Input
-                        className="w-16 text-center"
+                        className="w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
                         type="number"
                         {...form.register(`constraintCoefficients.${constraintIndex}.${varIndex}`, { 
                           valueAsNumber: true,
@@ -295,13 +311,13 @@ export function LPForm({ onSolve }: LPFormProps) {
                           }
                         })}
                       />
-                      <span className="ml-1 mr-2">x<sub>{varIndex + 1}</sub></span>
-                      {varIndex < numVariables - 1 && <span>+</span>}
+                      <span className="ml-1 mr-2 text-blue-300">x<sub>{varIndex + 1}</sub></span>
+                      {varIndex < numVariables - 1 && <span className="text-blue-400">+</span>}
                     </div>
                   ))}
                   
                   <select
-                    className="w-16 h-10 rounded-md border border-input bg-background px-3"
+                    className="w-16 h-10 rounded-md border border-blue-500/50 bg-blue-900/50 text-white px-3"
                     {...form.register(`constraintSigns.${constraintIndex}`, {
                       onChange: (e) => {
                         const current = [...form.getValues().constraintSigns]
@@ -318,7 +334,7 @@ export function LPForm({ onSolve }: LPFormProps) {
                   </select>
                   
                   <Input
-                    className="w-16 text-center"
+                    className="w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
                     type="number"
                     {...form.register(`constraintValues.${constraintIndex}`, { 
                       valueAsNumber: true,
@@ -339,10 +355,13 @@ export function LPForm({ onSolve }: LPFormProps) {
 
           <div className="flex items-center justify-between">
             <FormDescription>
-              Entrez les détails de votre problème de programmation linéaire et cliquez sur Résoudre.
+              <span className="text-blue-200/70">
+                Configurez votre problème et cliquez sur Résoudre pour obtenir la solution optimale.
+              </span>
             </FormDescription>
-            <Button type="submit" size="lg" className="gap-2">
-              Résoudre <ChevronRightCircle className="h-4 w-4" />
+            <Button type="submit" size="lg" className="modern-button gap-3">
+              <span>Résoudre</span>
+              <ChevronRightCircle className="h-5 w-5" />
             </Button>
           </div>
         </form>
