@@ -92,7 +92,7 @@ export function ResultsTable({ tableData, method }: TableData) {
       <div className="flex items-center space-x-3 mb-4">
         <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-cyan-300 rounded-full"></div>
         <h2 className="text-2xl font-bold gradient-text">
-          {method === 'simplex' ? 'Tableau du Simplexe' : 
+          {method === 'simplex' ? 'Algorithme du Simplexe - Itérations Complètes' : 
            method === 'general' ? 'Résultats Forme Générale' : 'Tableau des Résultats'}
         </h2>
       </div>
@@ -102,7 +102,7 @@ export function ResultsTable({ tableData, method }: TableData) {
           <TableHeader>
             <TableRow>
               {headers.map((header, index) => (
-                <TableHead key={index} className="text-center whitespace-nowrap text-blue-300 font-semibold">
+                <TableHead key={index} className="text-center whitespace-nowrap text-blue-300 font-semibold text-xs px-2">
                   {header}
                 </TableHead>
               ))}
@@ -110,9 +110,23 @@ export function ResultsTable({ tableData, method }: TableData) {
           </TableHeader>
           <TableBody>
             {rows.map((row, rowIndex) => (
-              <TableRow key={rowIndex} className="hover:bg-blue-500/10">
+              <TableRow key={rowIndex} className={`hover:bg-blue-500/10 ${
+                row[0] && (row[0].includes('Tableau') || row[0].includes('Itération')) 
+                  ? 'bg-blue-600/20 font-bold' 
+                  : row[1] === 'Ci' || row[1] === 'Cj' || row[1] === 'Δj'
+                    ? 'bg-blue-500/10'
+                    : ''
+              }`}>
                 {row.map((cell, cellIndex) => (
-                  <TableCell key={cellIndex} className="text-center text-white font-mono">
+                  <TableCell key={cellIndex} className={`text-center font-mono text-xs px-2 ${
+                    row[0] && (row[0].includes('Tableau') || row[0].includes('Itération'))
+                      ? 'text-blue-300 font-bold'
+                      : row[1] === 'Δj' && parseFloat(cell) > 0
+                        ? 'text-red-400 font-bold'
+                        : row[1] === 'Δj' && cell.includes('Z =')
+                          ? 'text-green-400 font-bold'
+                          : 'text-white'
+                  }`}>
                     {cell}
                   </TableCell>
                 ))}
@@ -121,6 +135,18 @@ export function ResultsTable({ tableData, method }: TableData) {
           </TableBody>
         </Table>
       </div>
+      
+      {method === 'simplex' && (
+        <div className="mt-6 p-4 glass-effect rounded-xl border border-blue-500/20">
+          <h3 className="text-lg font-semibold mb-3 text-blue-300">📋 Explication de l'Algorithme</h3>
+          <div className="space-y-2 text-sm text-blue-200/80">
+            <p><strong>F1:</strong> Nouvelle valeur de la ligne i : x<sub>ir</sub> = x<sub>ir</sub>/a<sub>ij</sub></p>
+            <p><strong>F2:</strong> Nouvelles valeurs des autres lignes : x<sub>kr</sub> = x<sub>kr</sub> - x<sub>kj</sub>(x<sub>i</sub>/a<sub>ij</sub>)</p>
+            <p><strong>F3:</strong> Nouvelle valeur de la fonction économique : Z = Z + (x<sub>i</sub>/a<sub>ij</sub>) Δ<sub>j</sub></p>
+            <p><strong>Test d'optimalité:</strong> Tous les Δ<sub>j</sub> ≤ 0 pour la maximisation</p>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

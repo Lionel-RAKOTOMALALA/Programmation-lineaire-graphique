@@ -77,13 +77,319 @@ function generalFormMethod(
 function simplexMethod(
   objectiveFunction: number[],
   constraintCoefficients: number[][],
+  constraintSigns: ("<=" | "=" | ">=")[],
   constraintValues: number[],
   isMaximization: boolean
 ): LPSolution {
-  // Convert minimization to maximization
-  const objective = isMaximization 
-    ? [...objectiveFunction]
-    : objectiveFunction.map(x => -x);
+  const n = objectiveFunction.length; // nombre de variables principales
+  const m = constraintCoefficients.length; // nombre de contraintes
+  
+  // Étape 1: Conversion en forme canonique (ajouter variables d'écart)
+  // Créer le tableau initial avec variables d'écart
+  const tableau: number[][] = [];
+  
+  // Variables de base initiales (variables d'écart)
+  const basisVariables: number[] = [];
+  const basisCosts: number[] = [];
+  
+  // Ajouter les contraintes avec variables d'écart
+  for (let i = 0; i < m; i++) {
+    const row: number[] = [];
+    
+    // Coefficients des variables principales
+    for (let j = 0; j < n; j++) {
+      row.push(constraintCoefficients[i][j]);
+    }
+    
+    // Coefficients des variables d'écart
+    for (let j = 0; j < m; j++) {
+      row.push(i === j ? 1 : 0);
+    }
+    
+    // Terme de droite
+    row.push(constraintValues[i]);
+    
+    tableau.push(row);
+    basisVariables.push(n + i); // Variable d'écart xi+n est en base
+    basisCosts.push(0); // Coût des variables d'écart = 0
+  }
+  
+  // Ligne de la fonction objectif (ligne Z)
+  const objectiveRow: number[] = [];
+  
+  // Coefficients Cj (fonction objectif)
+  const cj: number[] = [];
+  for (let j = 0; j < n; j++) {
+    cj.push(isMaximization ? objectiveFunction[j] : -objectiveFunction[j]);
+  }
+  for (let j = 0; j < m; j++) {
+    cj.push(0); // Variables d'écart ont un coût de 0
+  }
+  
+  // Calculer Δj = Cj - Zj pour chaque colonne
+  const deltaJ: number[] = [];
+  for (let j = 0; j < n + m; j++) {
+    let zj = 0;
+    for (let i = 0; i < m; i++) {
+      zj += basisCosts[i] * tableau[i][j];
+    }
+    deltaJ.push(cj[j] - zj);
+  }
+  
+  // Valeur initiale de Z
+  let zValue = 0;
+  for (let i = 0; i < m; i++) {
+    zValue += basisCosts[i] * tableau[i][n + m];
+  }
+  
+  // Stocker toutes les itérations pour l'affichage
+  const iterations: any[] = [];
+  
+  // Tableau initial
+  iterations.push({
+    iteration: 0,
+    title: "Tableau initial de simplexe",
+    tableau: tableau.map(row => [...row]),
+    basisVariables: [...basisVariables],
+    basisCosts: [...basisCosts],
+    cj: [...cj],
+    deltaJ: [...deltaJ],
+    zValue: zValue,
+    isOptimal: false
+  });
+  
+  let iterationCount = 0;
+  const maxIterations = 20;
+  
+  // Algorithme du simplexe
+  while (iterationCount < maxIterations) {
+    // Test d'optimalité: tous les Δj ≤ 0 pour maximisation
+    const isOptimal = deltaJ.every(dj => dj <= 1e-10);
+    
+    if (isOptimal) {
+      break;
+    }
+    
+    // Étape 1: Trouver la variable entrante (colonne pivot)
+    // Choisir j tel que Δj soit le plus grand positif
+    let enteringCol = -1;
+    let maxDelta = -Infinity;
+    for (let j = 0; j < n + m; j++) {
+      if (deltaJ[j] > maxDelta) {
+        maxDelta = deltaJ[j];
+        enteringCol = j;
+      }
+    }
+    
+    if (enteringCol === -1 || maxDelta <= 1e-10) {
+      break; // Solution optimale trouvée
+    }
+    
+    // Étape 2: Trouver la variable sortante (ligne pivot)
+    // Test du rapport minimal: min(xi/aij) pour aij > 0
+    let leavingRow = -1;
+    let minRatio = Infinity;
+    
+    for (let i = 0; i < m; i++) {
+      if (tableau[i][enteringCol] > 1e-10) {
+        const ratio = tableau[i][n + m] / tableau[i][enteringCol];
+        if (ratio < minRatio) {
+          minRatio = ratio;
+          leavingRow = i;
+        }
+      }
+    }
+    
+    if (leavingRow === -1) {
+      // Solution non bornée
+      return {
+        isValid: false,
+        coordinates: [],
+        value: 0,
+        tableData: { headers: [], rows: [] }
+      };
+    }
+    
+    const pivot = tableau[leavingRow][enteringCol];
+    
+    // Étape 3: Opérations de pivot
+    
+    // F1: Nouvelle valeur de la ligne i (ligne pivot)
+    // xir = xir/aij, xi = xi/aij
+    for (let j = 0; j <= n + m; j++) {
+      tableau[leavingRow][j] = tableau[leavingRow][j] / pivot;
+    }
+    
+    // F2: Nouvelles valeurs des autres lignes
+    // xkr = xkr - xkj(xi/aij), xk = xk - xkj(xi/aij)
+    for (let i = 0; i < m; i++) {
+      if (i !== leavingRow) {
+        const multiplier = tableau[i][enteringCol];
+        for (let j = 0; j <= n + m; j++) {
+          tableau[i][j] = tableau[i][j] - multiplier * tableau[leavingRow][j];
+        }
+      }
+    }
+    
+    // Mettre à jour la base
+    basisVariables[leavingRow] = enteringCol;
+    basisCosts[leavingRow] = cj[enteringCol];
+    
+    // F3: Recalculer Δj = Cj - Zj
+    for (let j = 0; j < n + m; j++) {
+      let zj = 0;
+      for (let i = 0; i < m; i++) {
+        zj += basisCosts[i] * tableau[i][j];
+      }
+      deltaJ[j] = cj[j] - zj;
+    }
+    
+    // Nouvelle valeur de Z
+    zValue = 0;
+    for (let i = 0; i < m; i++) {
+      zValue += basisCosts[i] * tableau[i][n + m];
+    }
+    
+    iterationCount++;
+    
+    // Sauvegarder cette itération
+    iterations.push({
+      iteration: iterationCount,
+      title: `Itération ${iterationCount}`,
+      tableau: tableau.map(row => [...row]),
+      basisVariables: [...basisVariables],
+      basisCosts: [...basisCosts],
+      cj: [...cj],
+      deltaJ: [...deltaJ],
+      zValue: zValue,
+      enteringCol: enteringCol,
+      leavingRow: leavingRow,
+      pivot: pivot,
+      isOptimal: deltaJ.every(dj => dj <= 1e-10)
+    });
+  }
+  
+  // Extraire la solution finale
+  const solution = Array(n).fill(0);
+  for (let i = 0; i < m; i++) {
+    const varIndex = basisVariables[i];
+    if (varIndex < n) {
+      solution[varIndex] = tableau[i][n + m];
+    }
+  }
+  
+  // Créer les données du tableau pour l'affichage
+  const tableData = createSimplexTableData(iterations, n, m);
+  
+  return {
+    isValid: true,
+    coordinates: solution,
+    value: isMaximization ? zValue : -zValue,
+    tableData: tableData
+  };
+}
+
+function createSimplexTableData(iterations: any[], n: number, m: number): { headers: string[], rows: string[][] } {
+  const headers = ['Itération', 'Ci', 'i', 'Base'];
+  
+  // Ajouter les colonnes pour chaque variable
+  for (let j = 1; j <= n; j++) {
+    headers.push(`A${j}`);
+  }
+  for (let j = 1; j <= m; j++) {
+    headers.push(`A${n + j}`);
+  }
+  headers.push('A0', 'xi/xj0');
+  
+  const rows: string[][] = [];
+  
+  for (const iter of iterations) {
+    // Titre de l'itération
+    const titleRow = [iter.title, '', '', '', ...Array(n + m + 2).fill('')];
+    rows.push(titleRow);
+    
+    // En-têtes des colonnes
+    const headerRow = ['', 'Ci', 'i'];
+    for (let j = 1; j <= n; j++) {
+      headerRow.push(`A${j}`);
+    }
+    for (let j = 1; j <= m; j++) {
+      headerRow.push(`A${n + j}`);
+    }
+    headerRow.push('A0');
+    if (iter.iteration > 0) {
+      headerRow.push('xi/xj0');
+    }
+    rows.push(headerRow);
+    
+    // Lignes des contraintes
+    for (let i = 0; i < m; i++) {
+      const row = [''];
+      row.push(iter.basisCosts[i].toString());
+      row.push((iter.basisVariables[i] + 1).toString());
+      
+      // Coefficients du tableau
+      for (let j = 0; j < n + m; j++) {
+        row.push(iter.tableau[i][j].toFixed(2));
+      }
+      row.push(iter.tableau[i][n + m].toFixed(2));
+      
+      // Ratio test pour la variable sortante
+      if (iter.iteration > 0 && iter.enteringCol !== undefined) {
+        if (iter.tableau[i][iter.enteringCol] > 1e-10) {
+          const ratio = iter.tableau[i][n + m] / iter.tableau[i][iter.enteringCol];
+          row.push(ratio.toFixed(2));
+        } else {
+          row.push('∞');
+        }
+      }
+      
+      rows.push(row);
+    }
+    
+    // Ligne Cj
+    const cjRow = ['', 'Cj'];
+    cjRow.push('');
+    for (let j = 0; j < n + m; j++) {
+      cjRow.push(iter.cj[j].toString());
+    }
+    cjRow.push('');
+    if (iter.iteration > 0) {
+      cjRow.push('');
+    }
+    rows.push(cjRow);
+    
+    // Ligne Δj
+    const deltaRow = ['', 'Δj'];
+    deltaRow.push('');
+    for (let j = 0; j < n + m; j++) {
+      deltaRow.push(iter.deltaJ[j].toFixed(2));
+    }
+    deltaRow.push(`Z = ${iter.zValue.toFixed(2)}`);
+    if (iter.iteration > 0) {
+      deltaRow.push('');
+    }
+    rows.push(deltaRow);
+    
+    // Ligne vide entre les itérations
+    if (iter.iteration < iterations.length - 1) {
+      rows.push(Array(headers.length).fill(''));
+    }
+  }
+  
+  return { headers, rows };
+}
+
+function generalFormMethod(
+  objectiveFunction: number[],
+  constraintCoefficients: number[][],
+  constraintSigns: ("<=" | "=" | ">=")[],
+  constraintValues: number[],
+  isMaximization: boolean
+): LPSolution {
+  // Pour la forme générale, utiliser la méthode du simplexe
+  return simplexMethod(objectiveFunction, constraintCoefficients, constraintSigns, constraintValues, isMaximization);
+}
 
   // Initialize tableau
   const m = constraintCoefficients.length; // number of constraints
@@ -386,6 +692,7 @@ export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'gra
       return simplexMethod(
         objectiveFunction,
         constraintCoefficients,
+        constraintSigns,
         constraintValues,
         problemType === 'max'
       );
@@ -414,6 +721,7 @@ export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'gra
       return simplexMethod(
         objectiveFunction,
         constraintCoefficients,
+        constraintSigns,
         constraintValues,
         problemType === 'max'
       );
