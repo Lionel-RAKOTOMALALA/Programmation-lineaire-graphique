@@ -243,15 +243,71 @@ function graphicalMethod(
   constraintValues: number[],
   isMaximization: boolean
 ): LPSolution {
-  // Générer tous les points d'intersection
+  // Générer tous les points d'intersection et créer le tableau selon le format demandé
   const points: number[][] = [];
   const n = constraintCoefficients.length;
+  
+  // Créer les données du tableau selon le format de l'image
+  const tableRows: string[][] = [];
+  
   for (let i = 0; i < n; i++) {
+    const coeffs = constraintCoefficients[i];
+    const sign = constraintSigns[i];
+    const value = constraintValues[i];
+    
+    // Contrainte originale
+    const constraintStr = `${coeffs[0]}x₁ ${coeffs[1] >= 0 ? '+' : ''}${coeffs[1]}x₂ ${sign} ${value}`;
+    
+    // Équation de la droite (égalité)
+    const equationStr = `${coeffs[0]}x₁ ${coeffs[1] >= 0 ? '+' : ''}${coeffs[1]}x₂ = ${value}`;
+    
+    // Calculer les points d'intersection avec les axes
+    const intersectionPoints: string[] = [];
+    
+    // Intersection avec l'axe x₁ (x₂ = 0)
+    if (coeffs[0] !== 0) {
+      const x1 = value / coeffs[0];
+      if (x1 >= 0) {
+        intersectionPoints.push(`(${x1.toFixed(x1 % 1 === 0 ? 0 : 1)}, 0)`);
+      }
+    }
+    
+    // Intersection avec l'axe x₂ (x₁ = 0)
+    if (coeffs[1] !== 0) {
+      const x2 = value / coeffs[1];
+      if (x2 >= 0) {
+        intersectionPoints.push(`(0, ${x2.toFixed(x2 % 1 === 0 ? 0 : 1)})`);
+      }
+    }
+    
+    // Ajouter des points supplémentaires si nécessaire
+    while (intersectionPoints.length < 3) {
+      intersectionPoints.push('-');
+    }
+    
+    tableRows.push([
+      constraintStr,
+      equationStr,
+      intersectionPoints[0] || '-',
+      intersectionPoints[1] || '-',
+      intersectionPoints[2] || '-'
+    ]);
+    
     for (let j = i + 1; j < n; j++) {
       const pt = intersection2D(constraintCoefficients[i], constraintValues[i], constraintCoefficients[j], constraintValues[j]);
       if (pt) points.push(pt);
     }
   }
+  
+  // Ajouter la ligne pour les contraintes de non-négativité
+  tableRows.push([
+    'x₁, x₂ ≥ 0',
+    'x₁ = 0, x₂ = 0',
+    '(0, 0)',
+    '-',
+    '-'
+  ]);
+  
   // Intersections avec x1=0 et x2=0
   for (let i = 0; i < n; i++) {
     // x1 = 0
@@ -292,14 +348,9 @@ function graphicalMethod(
     isValid: true,
     coordinates: feasible[idx],
     value: values[idx],
-    tableData: { 
-      headers: ["Point", "x₁", "x₂", "Z"], 
-      rows: feasible.map((pt, i) => [
-        `P${i+1}`, 
-        pt[0].toFixed(3), 
-        pt[1].toFixed(3), 
-        values[i].toFixed(3)
-      ]) 
+    tableData: {
+      headers: ["Contraintes", "Équations des droites", "Point 1", "Point 2", "Point 3"],
+      rows: tableRows
     }
   };
 }
